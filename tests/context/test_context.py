@@ -64,6 +64,17 @@ def test_update():
     }
 
 
+def test_copy_querystring_list_isolation():
+    c1 = Context('http://localhost')
+    c1.querystring_params['name'] = ['alice', 'bob']
+    c2 = c1.copy()
+
+    c2.querystring_params['name'].append('charlie')
+
+    assert c1.querystring_params == {'name': ['alice', 'bob']}
+    assert c2.querystring_params == {'name': ['alice', 'bob', 'charlie']}
+
+
 def test_spec():
     c = Context('http://localhost', spec={
         'paths': {

@@ -85,7 +85,10 @@ class Context(object):
     def copy(self):
         context = Context(self.url)
         context.headers = self.headers.copy()
-        context.querystring_params = self.querystring_params.copy()
+        context.querystring_params = {
+            k: list(v) if isinstance(v, list) else v
+            for k, v in self.querystring_params.items()
+        }
         context.body_params = self.body_params.copy()
         context.body_json_params = self.body_json_params.copy()
         context.options = self.options.copy()

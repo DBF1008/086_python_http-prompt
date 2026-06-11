@@ -35,7 +35,8 @@ def _extract_httpie_options(context, quote=False, join_key_value=False,
     return opts
 
 
-def _extract_httpie_request_items(context, quote=False):
+def _extract_httpie_request_items(context, quote=False,
+                                   group_multi_values=False):
     if quote:
         quote_func = smart_quote
     else:
@@ -57,9 +58,14 @@ def _extract_httpie_request_items(context, quote=False):
                 item = '%s:=%s' % (k, quote_func(json_str))
                 items.append(item)
             elif isinstance(value, (list, tuple)):
-                for v in value:
-                    item = quote_func('%s%s%s' % (k, sep, v))
-                    items.append(item)
+                if group_multi_values:
+                    parts = [quote_func('%s%s%s' % (k, sep, v))
+                             for v in value]
+                    items.append(' '.join(parts))
+                else:
+                    for v in value:
+                        item = quote_func('%s%s%s' % (k, sep, v))
+                        items.append(item)
             else:
                 item = quote_func('%s%s%s' % (k, sep, value))
                 items.append(item)
@@ -106,5 +112,6 @@ def format_to_http_prompt(context, excluded_options=None):
     cmds = _extract_httpie_options(context, quote=True, join_key_value=True,
                                    excluded_keys=excluded_options)
     cmds.append('cd ' + smart_quote(context.url))
-    cmds += _extract_httpie_request_items(context, quote=True)
+    cmds += _extract_httpie_request_items(context, quote=True,
+                                           group_multi_values=True)
     return '\n'.join(cmds) + '\n'

@@ -151,6 +151,34 @@ def test_format_raw_json_string_to_http_prompt():
                       "bar:='\"baz\"'\n")
 
 
+def test_format_to_http_prompt_multi_value_querystring():
+    c = Context('http://localhost/things')
+    c.querystring_params.update({
+        'name': ['alice', 'bob bob'],
+        'page': ['2']
+    })
+    c.headers['Accept'] = 'text/html'
+
+    output = t.format_to_http_prompt(c)
+    assert output == ("cd http://localhost/things\n"
+                      "name==alice 'name==bob bob'\n"
+                      "page==2\n"
+                      "Accept:text/html\n")
+
+
+def test_format_to_http_prompt_single_value_list_unchanged():
+    c = Context('http://localhost')
+    c.querystring_params.update({
+        'limit': ['50'],
+        'page': ['1']
+    })
+
+    output = t.format_to_http_prompt(c)
+    assert output == ("cd http://localhost\n"
+                      "limit==50\n"
+                      "page==1\n")
+
+
 def test_extract_httpie_options():
     c = Context('http://localhost')
     c.options.update({
