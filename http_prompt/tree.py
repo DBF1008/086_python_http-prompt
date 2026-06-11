@@ -11,6 +11,7 @@ class Node(object):
         self.data = data or {}
         self.parent = parent
         self.children = set()
+        self.methods = set()
 
     def __str__(self):
         return self.name
@@ -33,6 +34,7 @@ class Node(object):
 
     def add_path(self, *path, **kwargs):
         node_type = kwargs.get('node_type', 'dir')
+        methods = kwargs.get('methods', None)
         name = path[0]
         tail = path[1:]
         child = self.find_child(name, wildcard=False)
@@ -41,8 +43,11 @@ class Node(object):
             child = Node(name, data=data, parent=self)
             self.children.add(child)
 
+        if methods and not tail:
+            child.methods.update(methods)
+
         if tail:
-            child.add_path(*tail, node_type=node_type)
+            child.add_path(*tail, node_type=node_type, methods=methods)
 
     def find_child(self, name, wildcard=True):
         for child in self.children:
@@ -75,4 +80,29 @@ class Node(object):
                     break
         if success:
             for node in sorted(cur.children):
+                yield node
+
+    def ls_params(self, *path, **kwargs):
+        method = kwargs.get('method', None)
+        success = True
+        cur = self
+        for name in path:
+            if not name or name == '.':
+                continue
+            elif name == '..':
+                if cur.parent:
+                    cur = cur.parent
+            else:
+                child = cur.find_child(name)
+                if child:
+                    cur = child
+                else:
+                    success = False
+                    break
+        if success:
+            for node in sorted(cur.children):
+                if node.data.get('type') != 'file':
+                    continue
+                if method and node.methods and method not in node.methods:
+                    continue
                 yield node

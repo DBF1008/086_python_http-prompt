@@ -65,11 +65,11 @@ class Context(object):
                                 if param.get('in') != 'path':
                                     # Note that for completion mechanism, only
                                     # name/node_type is used
-                                    # Parameters from methods/location
-                                    # are merged
+                                    # Parameters are tagged with their method
                                     full_path = path_tokens + [param['name']]
                                     self.root.add_path(*full_path,
-                                                       node_type='file')
+                                                       node_type='file',
+                                                       methods={method})
         elif not self.url:
             self.url = 'http://localhost:8000'
 

@@ -129,3 +129,65 @@ class TestNode(unittest.TestCase):
 
         self.assertEqual([n.name for n in self.root.ls('q')],
                          list('rustv'))
+
+    def test_add_path_with_methods(self):
+        self.root.add_path('x', 'p1', node_type='file', methods={'get'})
+        node_x = self.root.find_child('x')
+        node_p1 = node_x.find_child('p1')
+        self.assertEqual(node_p1.methods, {'get'})
+        self.assertEqual(node_p1.data.get('type'), 'file')
+
+    def test_add_path_methods_merge(self):
+        self.root.add_path('x', 'p1', node_type='file', methods={'get'})
+        self.root.add_path('x', 'p1', node_type='file', methods={'post'})
+        node_x = self.root.find_child('x')
+        node_p1 = node_x.find_child('p1')
+        self.assertEqual(node_p1.methods, {'get', 'post'})
+
+    def test_add_path_no_methods(self):
+        self.root.add_path('x', 'p1', node_type='file')
+        node_x = self.root.find_child('x')
+        node_p1 = node_x.find_child('p1')
+        self.assertEqual(node_p1.methods, set())
+
+    def test_methods_not_set_on_dir_nodes(self):
+        self.root.add_path('x', 'y', 'p1', node_type='file', methods={'get'})
+        node_x = self.root.find_child('x')
+        self.assertEqual(node_x.methods, set())
+        node_y = node_x.find_child('y')
+        self.assertEqual(node_y.methods, set())
+
+    def test_ls_params_no_filter(self):
+        self.root.add_path('q', 'r')
+        self.root.add_path('q', 's', node_type='file', methods={'get'})
+        self.root.add_path('q', 't', node_type='file', methods={'post'})
+        self.root.add_path('q', 'u')
+
+        result = [n.name for n in self.root.ls_params('q')]
+        self.assertEqual(result, list('st'))
+
+    def test_ls_params_with_method(self):
+        self.root.add_path('q', 's', node_type='file', methods={'get'})
+        self.root.add_path('q', 't', node_type='file', methods={'post'})
+        self.root.add_path('q', 'u', node_type='file', methods={'get', 'post'})
+
+        result = [n.name for n in self.root.ls_params('q', method='get')]
+        self.assertEqual(result, list('su'))
+
+        result = [n.name for n in self.root.ls_params('q', method='post')]
+        self.assertEqual(result, list('tu'))
+
+    def test_ls_params_empty_methods_passthrough(self):
+        """Nodes without methods set should pass through any filter."""
+        self.root.add_path('q', 's', node_type='file')
+        self.root.add_path('q', 't', node_type='file', methods={'post'})
+
+        result = [n.name for n in self.root.ls_params('q', method='get')]
+        self.assertEqual(result, ['s'])
+
+        result = [n.name for n in self.root.ls_params('q', method='post')]
+        self.assertEqual(result, list('st'))
+
+    def test_ls_params_non_existing_path(self):
+        result = [n.name for n in self.root.ls_params('nonexist')]
+        self.assertEqual(result, [])

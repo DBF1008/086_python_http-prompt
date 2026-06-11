@@ -159,3 +159,90 @@ def test_override():
     assert next(filter(lambda i:i.name == 'custom1', users_methods), None) is not None
     assert next(filter(lambda i:i.name == 'custom2', users_methods), None) is not None
     assert next(filter(lambda i:i.name == 'Accept', users_methods), None) is not None
+
+
+def test_spec_method_params():
+    """Parameters should be tagged with their HTTP method."""
+    c = Context('http://localhost', spec={
+        'paths': {
+            '/items': {
+                'get': {
+                    'parameters': [
+                        {'name': 'limit', 'in': 'query'},
+                        {'name': 'offset', 'in': 'query'},
+                    ]
+                },
+                'post': {
+                    'parameters': [
+                        {'name': 'name', 'in': 'body'},
+                    ]
+                }
+            }
+        }
+    })
+    items = c.root.find_child('items')
+    limit = items.find_child('limit')
+    offset = items.find_child('offset')
+    name = items.find_child('name')
+
+    assert limit.methods == {'get'}
+    assert offset.methods == {'get'}
+    assert name.methods == {'post'}
+
+
+def test_spec_path_level_params_inherit_methods():
+    """Path-level params should be tagged with all methods they apply to."""
+    c = Context('http://localhost', spec={
+        'paths': {
+            '/items': {
+                'parameters': [
+                    {'name': 'shared', 'in': 'query'},
+                ],
+                'get': {
+                    'parameters': [
+                        {'name': 'get_only', 'in': 'query'},
+                    ]
+                },
+                'post': {
+                    'parameters': [
+                        {'name': 'post_only', 'in': 'query'},
+                    ]
+                }
+            }
+        }
+    })
+    items = c.root.find_child('items')
+    shared = items.find_child('shared')
+    get_only = items.find_child('get_only')
+    post_only = items.find_child('post_only')
+
+    assert shared.methods == {'get', 'post'}
+    assert get_only.methods == {'get'}
+    assert post_only.methods == {'post'}
+
+
+def test_spec_override_method_params():
+    """Method-level param with same name/in overrides path-level."""
+    c = Context('http://localhost', spec={
+        'paths': {
+            '/items': {
+                'parameters': [
+                    {'name': 'filter', 'in': 'query'},
+                ],
+                'get': {
+                    'parameters': [
+                        {'name': 'filter', 'in': 'query'},
+                        {'name': 'sort', 'in': 'query'},
+                    ]
+                },
+                'post': {}
+            }
+        }
+    })
+    items = c.root.find_child('items')
+    filt = items.find_child('filter')
+    sort = items.find_child('sort')
+
+    # filter is defined at path-level (applies to post) and overridden by get
+    assert filt.methods == {'get', 'post'}
+    assert sort.methods == {'get'}

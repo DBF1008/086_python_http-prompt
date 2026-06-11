@@ -11,6 +11,9 @@ from prompt_toolkit.completion import Completer, Completion
 from .completion import (ROOT_COMMANDS, ACTIONS, OPTION_NAMES, HEADER_NAMES,
                          HEADER_VALUES)
 
+HTTP_METHODS = {'get', 'head', 'post', 'put', 'patch', 'delete', 'connect',
+                'options'}
+
 
 RULES = [
     # (regex pattern, a method name in CompletionGenerator)
@@ -94,12 +97,21 @@ class CompletionGenerator(object):
         return self._generic_generate(ACTIONS.keys(), {}, ACTIONS)
 
     def concat_mutations(self, context, match):
+        method = None
+        try:
+            candidate = match.group(1)
+            if candidate in HTTP_METHODS:
+                method = candidate
+        except (IndexError, AttributeError):
+            pass
+
         return chain(
             self._generic_generate(context.body_params.keys(),
                                    context.body_params, 'Body parameter'),
             self._generic_generate(context.querystring_params.keys(),
                                    context.querystring_params,
                                    'Querystring parameter'),
+            self._get_spec_params(context, method),
             self._generic_generate(HEADER_NAMES.keys(),
                                    context.headers, HEADER_NAMES),
             self._generic_generate(OPTION_NAMES.keys(),
@@ -137,6 +149,13 @@ class CompletionGenerator(object):
             if node.data.get('type') == 'dir'
         ]
         return self._generic_generate(names, {}, 'Endpoint')
+
+    def _get_spec_params(self, context, method):
+        path = urlparse(context.url).path.split('/')
+        path = [p for p in path if p]
+        nodes = context.root.ls_params(*path, method=method)
+        return self._generic_generate(
+            [n.name for n in nodes], {}, 'Spec parameter')
 
     def _generic_generate(self, names, values, descs):
         for name in sorted(names):

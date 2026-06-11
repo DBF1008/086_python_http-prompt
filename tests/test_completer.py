@@ -128,3 +128,91 @@ class TestCompleter(unittest.TestCase):
         self.context.url = 'http://localhost/orgs'
         result = self.get_completions('cd 1/')
         self.assertEqual(result, ['events', 'members'])
+
+
+class TestSpecParamCompleter(unittest.TestCase):
+
+    def setUp(self):
+        self.context = Context('http://localhost', spec={
+            'paths': {
+                '/items': {
+                    'parameters': [
+                        {'name': 'shared', 'in': 'query'},
+                    ],
+                    'get': {
+                        'parameters': [
+                            {'name': 'limit', 'in': 'query'},
+                            {'name': 'offset', 'in': 'query'},
+                        ]
+                    },
+                    'post': {
+                        'parameters': [
+                            {'name': 'name', 'in': 'body'},
+                        ]
+                    }
+                },
+                '/users': {},
+            }
+        })
+        self.context.url = 'http://localhost/items'
+        self.completer = HttpPromptCompleter(self.context)
+        self.completer_event = None
+
+    def get_completions(self, command):
+        position = len(command)
+        completions = self.completer.get_completions(
+            Document(text=command, cursor_position=position),
+            self.completer_event)
+        return [c.text for c in completions]
+
+    def test_get_shows_get_params(self):
+        result = self.get_completions('get ')
+        self.assertIn('limit', result)
+        self.assertIn('offset', result)
+        self.assertIn('shared', result)
+        self.assertNotIn('name', result)
+
+    def test_post_shows_post_params(self):
+        result = self.get_completions('post ')
+        self.assertIn('name', result)
+        self.assertIn('shared', result)
+        self.assertNotIn('limit', result)
+        self.assertNotIn('offset', result)
+
+    def test_shared_params_in_all_methods(self):
+        result_get = self.get_completions('get ')
+        result_post = self.get_completions('post ')
+        self.assertIn('shared', result_get)
+        self.assertIn('shared', result_post)
+
+    def test_no_spec_no_spec_params(self):
+        """Without a spec, no spec parameters should appear."""
+        ctx = Context('http://localhost')
+        completer = HttpPromptCompleter(ctx)
+        result = [c.text for c in completer.get_completions(
+            Document(text='get ', cursor_position=4),
+            self.completer_event)]
+        self.assertNotIn('limit', result)
+        self.assertNotIn('shared', result)
+
+    def test_spec_params_coexist_with_context_params(self):
+        """User-set params and spec params should both appear."""
+        self.context.body_params['my_field'] = 'val'
+        result = self.get_completions('post ')
+        self.assertIn('my_field', result)
+        self.assertIn('name', result)
+        self.assertIn('shared', result)
+
+    def test_ls_still_shows_all_params(self):
+        """ls should show directories only, not be affected by method filter."""
+        self.context.url = 'http://localhost'
+        result = self.get_completions('ls ')
+        self.assertIn('items', result)
+        self.assertIn('users', result)
+
+    def test_cd_unaffected(self):
+        """cd completion should still work normally."""
+        self.context.url = 'http://localhost'
+        result = self.get_completions('cd ')
+        self.assertIn('items', result)
+        self.assertIn('users', result)
