@@ -576,6 +576,114 @@ class TestExecution_exit(ExecutionTestCase):
         self.assertTrue(self.context.should_exit)
 
 
+class TestExecution_exit_propagation(ExecutionTestCase):
+    """Regression tests: exit in source/exec scripts must stop subsequent
+    lines and propagate should_exit consistently with direct input."""
+
+    def test_source_exit_stops_remaining_lines(self):
+        """Lines after 'exit' in a sourced file must not execute."""
+        f = self.make_tempfile(
+            "X-Before:yes\n"
+            "exit\n"
+            "X-After:no\n")
+        execute('source %s' % f, self.context)
+
+        self.assertIn('X-Before', self.context.headers)
+        self.assertNotIn('X-After', self.context.headers)
+        self.assertTrue(self.context.should_exit)
+
+    def test_exec_exit_stops_remaining_lines(self):
+        """Lines after 'exit' in an exec'd file must not execute."""
+        f = self.make_tempfile(
+            "X-Before:yes\n"
+            "exit\n"
+            "X-After:no\n")
+        execute('exec %s' % f, self.context)
+
+        self.assertIn('X-Before', self.context.headers)
+        self.assertNotIn('X-After', self.context.headers)
+        self.assertTrue(self.context.should_exit)
+
+    def test_source_exit_first_line(self):
+        """Exit on the very first line should skip all remaining lines."""
+        f = self.make_tempfile(
+            "exit\n"
+            "X-Should-Not-Exist:yes\n")
+        execute('source %s' % f, self.context)
+
+        self.assertNotIn('X-Should-Not-Exist', self.context.headers)
+        self.assertTrue(self.context.should_exit)
+
+    def test_exec_exit_first_line(self):
+        """Exit on the very first line of exec should skip all remaining."""
+        f = self.make_tempfile(
+            "exit\n"
+            "X-Should-Not-Exist:yes\n")
+        execute('exec %s' % f, self.context)
+
+        self.assertNotIn('X-Should-Not-Exist', self.context.headers)
+        self.assertTrue(self.context.should_exit)
+
+    def test_source_mutation_then_exit_preserves_state(self):
+        """Mutations before exit must be kept in context."""
+        f = self.make_tempfile(
+            "X-Auth:token123\n"
+            "name=alice\n"
+            "page==2\n"
+            "exit\n")
+        execute('source %s' % f, self.context)
+
+        self.assertEqual(self.context.headers.get('X-Auth'), 'token123')
+        self.assertEqual(self.context.body_params.get('name'), 'alice')
+        self.assertEqual(self.context.querystring_params.get('page'), ['2'])
+        self.assertTrue(self.context.should_exit)
+
+    def test_exec_mutation_then_exit_preserves_state(self):
+        """Mutations before exit in exec must be kept in context."""
+        f = self.make_tempfile(
+            "X-Auth:token123\n"
+            "name=alice\n"
+            "exit\n")
+        execute('exec %s' % f, self.context)
+
+        self.assertEqual(self.context.headers.get('X-Auth'), 'token123')
+        self.assertEqual(self.context.body_params.get('name'), 'alice')
+        self.assertTrue(self.context.should_exit)
+
+    def test_source_no_exit_should_not_set_flag(self):
+        """A sourced file without exit must leave should_exit False."""
+        f = self.make_tempfile("X-Foo:bar\n")
+        execute('source %s' % f, self.context)
+
+        self.assertEqual(self.context.headers.get('X-Foo'), 'bar')
+        self.assertFalse(self.context.should_exit)
+
+    def test_exec_no_exit_should_not_set_flag(self):
+        """An exec'd file without exit must leave should_exit False."""
+        f = self.make_tempfile("X-Foo:bar\n")
+        execute('exec %s' % f, self.context)
+
+        self.assertEqual(self.context.headers.get('X-Foo'), 'bar')
+        self.assertFalse(self.context.should_exit)
+
+    def test_direct_input_exit_unchanged(self):
+        """Direct 'exit' command must still set should_exit (baseline)."""
+        self.assertFalse(self.context.should_exit)
+        execute('exit', self.context)
+        self.assertTrue(self.context.should_exit)
+
+    def test_source_exit_mid_script_preserves_earlier_cd(self):
+        """A cd before exit must remain in effect."""
+        f = self.make_tempfile(
+            "cd api/v2\n"
+            "exit\n"
+            "cd should-not-reach\n")
+        execute('source %s' % f, self.context)
+
+        self.assertTrue(self.context.url.endswith('/api/v2'))
+        self.assertTrue(self.context.should_exit)
+
+
 class TestExecution_cd(ExecutionTestCase):
 
     def test_single_level(self):

@@ -318,6 +318,8 @@ class ExecutionVisitor(NodeVisitor):
             execute('rm *', self.context, self.listener)
             for line in f:
                 execute(line, self.context, self.listener)
+                if self.context.should_exit:
+                    break
         return node
 
     def visit_source(self, node, children):
@@ -325,6 +327,8 @@ class ExecutionVisitor(NodeVisitor):
         with open(path, encoding='utf-8') as f:
             for line in f:
                 execute(line, self.context, self.listener)
+                if self.context.should_exit:
+                    break
         return node
 
     def _colorize(self, text, token_type):

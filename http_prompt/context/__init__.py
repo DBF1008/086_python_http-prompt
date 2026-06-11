@@ -101,4 +101,4 @@ class Context(object):
         self.body_params.update(context.body_params)
         self.body_json_params.update(context.body_json_params)
         self.options.update(context.options)
-        self.should_exit = self.should_exit
+        self.should_exit = self.should_exit or context.should_exit

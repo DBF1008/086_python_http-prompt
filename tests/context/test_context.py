@@ -159,3 +159,33 @@ def test_override():
     assert next(filter(lambda i:i.name == 'custom1', users_methods), None) is not None
     assert next(filter(lambda i:i.name == 'custom2', users_methods), None) is not None
     assert next(filter(lambda i:i.name == 'Accept', users_methods), None) is not None
+
+
+def test_update_propagates_should_exit():
+    """update() must propagate should_exit from the source context."""
+    c1 = Context('http://localhost')
+    c2 = Context('http://localhost')
+    c2.should_exit = True
+
+    c1.update(c2)
+    assert c1.should_exit
+
+
+def test_update_preserves_should_exit_when_already_set():
+    """update() must not reset should_exit if self already has it True."""
+    c1 = Context('http://localhost')
+    c1.should_exit = True
+    c2 = Context('http://localhost')
+    c2.should_exit = False
+
+    c1.update(c2)
+    assert c1.should_exit
+
+
+def test_update_should_exit_stays_false():
+    """update() must leave should_exit False when both are False."""
+    c1 = Context('http://localhost')
+    c2 = Context('http://localhost')
+
+    c1.update(c2)
+    assert not c1.should_exit
