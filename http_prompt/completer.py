@@ -19,6 +19,7 @@ RULES = [
 
     (r'(get|head|post|put|patch|delete|connect)\s+', 'concat_mutations'),
     (r'(httpie|curl)\s+', 'preview'),
+    (r'dry-run\s+', 'preview'),
     (r'rm\s+\-b\s+', 'existing_body_params'),
     (r'rm\s+\-h\s+', 'existing_header_names'),
     (r'rm\s+\-o\s+', 'existing_option_names'),

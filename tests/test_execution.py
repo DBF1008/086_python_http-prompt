@@ -1629,3 +1629,130 @@ class TestCommandPreviewRedirection(ExecutionTestCase):
         with open(filename) as f:
             content = f.read()
         self.assertEqual(content, 'hello world\nhttp http://localhost\n')
+
+
+class TestDryRun(ExecutionTestCase):
+
+    def test_basic_get(self):
+        execute('dry-run get', self.context)
+        output = self.get_stdout()
+        self.assertIn('Method:  GET', output)
+        self.assertIn('URL:     http://localhost', output)
+
+    def test_without_method(self):
+        execute('dry-run', self.context)
+        output = self.get_stdout()
+        self.assertIn('Method:  (default)', output)
+        self.assertIn('URL:     http://localhost', output)
+
+    def test_with_path(self):
+        execute('dry-run post /api/users', self.context)
+        output = self.get_stdout()
+        self.assertIn('Method:  POST', output)
+        self.assertIn('URL:     http://localhost/api/users', output)
+
+    def test_with_full_url(self):
+        execute('dry-run get http://example.com/api', self.context)
+        output = self.get_stdout()
+        self.assertIn('URL:     http://example.com/api', output)
+        self.assertEqual(self.context.url, 'http://localhost')
+
+    def test_with_headers(self):
+        execute('dry-run get Accept:text/html', self.context)
+        output = self.get_stdout()
+        self.assertIn('Headers:', output)
+        self.assertIn('  Accept: text/html', output)
+        self.assertFalse(self.context.headers)
+
+    def test_with_querystring(self):
+        execute('dry-run get page==1 limit==20', self.context)
+        output = self.get_stdout()
+        self.assertIn('Querystring:', output)
+        self.assertIn('  limit: 20', output)
+        self.assertIn('  page: 1', output)
+        self.assertFalse(self.context.querystring_params)
+
+    def test_with_body_params(self):
+        execute('dry-run post name=alice password=123', self.context)
+        output = self.get_stdout()
+        self.assertIn('Body Parameters:', output)
+        self.assertIn('  name: alice', output)
+        self.assertIn('  password: 123', output)
+        self.assertFalse(self.context.body_params)
+
+    def test_with_body_json_params(self):
+        execute('dry-run post count:=42', self.context)
+        output = self.get_stdout()
+        self.assertIn('Body JSON Parameters:', output)
+        self.assertIn('  count: 42', output)
+        self.assertFalse(self.context.body_json_params)
+
+    def test_with_options(self):
+        execute('dry-run post --form --auth user:pass', self.context)
+        output = self.get_stdout()
+        self.assertIn('Options:', output)
+        self.assertIn('  --form', output)
+        self.assertIn('  --auth: user:pass', output)
+        self.assertFalse(self.context.options)
+
+    def test_merges_with_context(self):
+        self.context.headers['Authorization'] = 'Bearer token123'
+        self.context.querystring_params['page'] = ['1']
+        execute('dry-run get limit==50', self.context)
+        output = self.get_stdout()
+        self.assertIn('  Authorization: Bearer token123', output)
+        self.assertIn('  page: 1', output)
+        self.assertIn('  limit: 50', output)
+        # Original context unchanged
+        self.assertEqual(self.context.headers,
+                         {'Authorization': 'Bearer token123'})
+        self.assertEqual(self.context.querystring_params, {'page': ['1']})
+
+    def test_does_not_call_httpie(self):
+        execute('dry-run post name=bob', self.context)
+        self.assertFalse(self.httpie_main.called)
+
+    def test_returns_plan_dict(self):
+        result = execute('dry-run post /api name=alice', self.context)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result['method'], 'POST')
+        self.assertEqual(result['url'], 'http://localhost/api')
+        self.assertEqual(result['body_params'], {'name': 'alice'})
+
+    def test_returns_plan_all_keys(self):
+        result = execute('dry-run get', self.context)
+        self.assertIn('method', result)
+        self.assertIn('url', result)
+        self.assertIn('headers', result)
+        self.assertIn('querystring', result)
+        self.assertIn('body_params', result)
+        self.assertIn('body_json_params', result)
+        self.assertIn('options', result)
+
+    def test_non_dry_run_returns_none(self):
+        result = execute('get', self.context)
+        self.assertIsNone(result)
+
+    def test_mutation_returns_none(self):
+        result = execute('name=bob', self.context)
+        self.assertIsNone(result)
+
+    def test_with_spaces(self):
+        execute('  dry-run   get  ', self.context)
+        output = self.get_stdout()
+        self.assertIn('Method:  GET', output)
+
+    def test_redirect_write(self):
+        filename = self.make_tempfile()
+        with open(filename, 'w') as f:
+            f.write('old content\n')
+        execute('dry-run get > %s' % filename, self.context)
+        with open(filename) as f:
+            content = f.read()
+        self.assertIn('Method:  GET', content)
+        self.assertIn('URL:     http://localhost', content)
+
+    def test_uppercase_method(self):
+        execute('dry-run POST', self.context)
+        output = self.get_stdout()
+        self.assertIn('Method:  POST', output)

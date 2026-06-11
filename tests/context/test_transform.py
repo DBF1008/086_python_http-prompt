@@ -160,3 +160,90 @@ def test_extract_httpie_options():
 
     output = t._extract_httpie_options(c, excluded_keys=['--form'])
     assert output == ['--verify', 'no']
+
+
+def test_build_request_plan_basic():
+    c = Context('http://localhost')
+    plan = t.build_request_plan(c, 'get')
+    assert plan['method'] == 'GET'
+    assert plan['url'] == 'http://localhost'
+    assert plan['headers'] == {}
+    assert plan['querystring'] == {}
+    assert plan['body_params'] == {}
+    assert plan['body_json_params'] == {}
+    assert plan['options'] == {}
+
+
+def test_build_request_plan_without_method():
+    c = Context('http://localhost')
+    plan = t.build_request_plan(c)
+    assert plan['method'] is None
+
+
+def test_build_request_plan_with_all_fields():
+    c = Context('http://localhost/api')
+    c.headers['Accept'] = 'application/json'
+    c.querystring_params['page'] = ['1']
+    c.body_params['name'] = 'alice'
+    c.body_json_params['count'] = 42
+    c.options['--form'] = None
+    plan = t.build_request_plan(c, 'post')
+    assert plan['method'] == 'POST'
+    assert plan['headers'] == {'Accept': 'application/json'}
+    assert plan['querystring'] == {'page': ['1']}
+    assert plan['body_params'] == {'name': 'alice'}
+    assert plan['body_json_params'] == {'count': 42}
+    assert plan['options'] == {'--form': None}
+
+
+def test_build_request_plan_decoupled():
+    c = Context('http://localhost')
+    c.headers['X-Key'] = 'value'
+    plan = t.build_request_plan(c, 'get')
+    plan['headers']['X-Key'] = 'modified'
+    assert c.headers['X-Key'] == 'value'
+
+
+def test_format_request_plan_minimal():
+    plan = {
+        'method': 'GET', 'url': 'http://localhost',
+        'headers': {}, 'querystring': {},
+        'body_params': {}, 'body_json_params': {}, 'options': {}
+    }
+    text = t.format_request_plan(plan)
+    assert 'Method:  GET' in text
+    assert 'URL:     http://localhost' in text
+    assert 'Headers:' not in text
+
+
+def test_format_request_plan_none_method():
+    plan = {
+        'method': None, 'url': 'http://localhost',
+        'headers': {}, 'querystring': {},
+        'body_params': {}, 'body_json_params': {}, 'options': {}
+    }
+    text = t.format_request_plan(plan)
+    assert 'Method:  (default)' in text
+
+
+def test_format_request_plan_flag_option():
+    plan = {
+        'method': 'POST', 'url': 'http://localhost',
+        'headers': {}, 'querystring': {},
+        'body_params': {}, 'body_json_params': {},
+        'options': {'--form': None}
+    }
+    text = t.format_request_plan(plan)
+    assert '  --form' in text
+    assert '--form: None' not in text
+
+
+def test_format_request_plan_multi_value_querystring():
+    plan = {
+        'method': 'GET', 'url': 'http://localhost',
+        'headers': {}, 'querystring': {'tag': ['a', 'b']},
+        'body_params': {}, 'body_json_params': {}, 'options': {}
+    }
+    text = t.format_request_plan(plan)
+    assert '  tag: a' in text
+    assert '  tag: b' in text

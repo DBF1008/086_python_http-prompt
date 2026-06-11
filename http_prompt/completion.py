@@ -9,6 +9,7 @@ ROOT_COMMANDS = OrderedDict([
     ('cd', 'Change URL/path'),
     ('clear', 'Clear console screen'),
     ('curl', 'Preview curl command'),
+    ('dry-run', 'Preview request plan'),
     ('env', 'Print environment'),
     ('exec', 'Clear and load environment from a file'),
     ('exit', 'Exit HTTP Prompt'),

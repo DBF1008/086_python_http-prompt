@@ -44,6 +44,7 @@ class HttpPromptLexer(RegexLexer):
             (r'(cd)(\s*)', bygroups(Keyword, Text), 'cd'),
             (r'(rm)(\s*)', bygroups(Keyword, Text), 'rm_option'),
             (r'(httpie|curl)(\s*)', bygroups(Keyword, Text), 'action'),
+            (r'(dry-run)(\s*)', bygroups(Keyword, Text), 'action'),
 
             (words(HTTP_METHODS, prefix='(?i)', suffix=r'(?!\S)(\s*)'),
              bygroups(Keyword, Text), combined('redir_out', 'urlpath')),

@@ -20,7 +20,9 @@ from pygments.token import String, Name
 from .completion import ROOT_COMMANDS, ACTIONS, OPTION_NAMES, HEADER_NAMES
 from .context import Context
 from .context.transform import (
+    build_request_plan,
     extract_args_for_httpie_main,
+    format_request_plan,
     format_to_curl,
     format_to_httpie,
     format_to_http_prompt)
@@ -35,12 +37,13 @@ grammar = r"""
     command = mutation / immutation
 
     mutation = concat_mut+ / nonconcat_mut
-    immutation = preview / action / ls / env / help / exit / exec / source / clear / _
+    immutation = preview / dry_run / action / ls / env / help / exit / exec / source / clear / _
 
     concat_mut = option_mut / full_quoted_mut / value_quoted_mut / unquoted_mut
     nonconcat_mut = cd / rm
 
     preview = _ tool _ (method _)? (urlpath _)? concat_mut* redir_out? _
+    dry_run = _ "dry-run" _ (method _)? (urlpath _)? concat_mut* redir_out? _
     action = _ method _ (urlpath _)? concat_mut* redir_out? _
     urlpath = (~r"https?://" unquoted_string) /
               (!concat_mut !redir_out string)
@@ -210,6 +213,9 @@ class ExecutionVisitor(NodeVisitor):
 
         # Last response object returned by HTTPie
         self.last_response = None
+
+        # Result for programmatic consumption (e.g., dry-run plan)
+        self.result = None
 
         # Pygments formatter, used to render output with colors in some cases
         if style:
@@ -481,6 +487,10 @@ class ExecutionVisitor(NodeVisitor):
         context.update(self.context_override)
         return context
 
+    def _build_request_plan(self):
+        context = self._final_context()
+        return build_request_plan(context, self.method)
+
     def _trace_get_response(self, frame, event, arg):
         func_name = frame.f_code.co_name
         if func_name == 'get_response':
@@ -525,6 +535,12 @@ class ExecutionVisitor(NodeVisitor):
         self.output.write(command)
         return node
 
+    def visit_dry_run(self, node, children):
+        plan = self._build_request_plan()
+        self.result = plan
+        self.output.write(format_request_plan(plan))
+        return node
+
     def visit_action(self, node, children):
         self._call_httpie_main()
         if self.last_response:
@@ -554,6 +570,7 @@ def execute(command, context, listener=None, style=None):
         # TODO: Better error message
         part = command[err.pos:err.pos + 10]
         click.secho('Syntax error near "%s"' % part, err=True, fg='red')
+        return None
     else:
         visitor = ExecutionVisitor(context, listener=listener, style=style)
         try:
@@ -576,6 +593,9 @@ def execute(command, context, listener=None, style=None):
             else:
                 # TODO: Better error message
                 click.secho(str(err), err=True, fg='red')
+            return None
         except CalledProcessError as err:
             click.secho(err.output + ' (exit status %d)' % err.returncode,
                         fg='red')
+            return None
+        return visitor.result

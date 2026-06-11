@@ -108,3 +108,67 @@ def format_to_http_prompt(context, excluded_options=None):
     cmds.append('cd ' + smart_quote(context.url))
     cmds += _extract_httpie_request_items(context, quote=True)
     return '\n'.join(cmds) + '\n'
+
+
+def build_request_plan(context, method=None):
+    """Build a structured request plan dictionary from a Context object.
+
+    The plan mirrors what ``_call_httpie_main`` would use, so dry-run output
+    and actual execution stay in sync.
+    """
+    return {
+        'method': method.upper() if method else None,
+        'url': context.url,
+        'headers': dict(sorted(context.headers.items())),
+        'querystring': dict(sorted(context.querystring_params.items())),
+        'body_params': dict(sorted(context.body_params.items())),
+        'body_json_params': dict(sorted(context.body_json_params.items())),
+        'options': dict(sorted(context.options.items())),
+    }
+
+
+def format_request_plan(plan):
+    """Format a request plan dictionary to a human-readable string."""
+    lines = []
+
+    lines.append('Method:  %s' % (plan['method'] or '(default)'))
+    lines.append('URL:     %s' % plan['url'])
+
+    if plan['headers']:
+        lines.append('')
+        lines.append('Headers:')
+        for k, v in plan['headers'].items():
+            lines.append('  %s: %s' % (k, v))
+
+    if plan['querystring']:
+        lines.append('')
+        lines.append('Querystring:')
+        for k, v in plan['querystring'].items():
+            if isinstance(v, (list, tuple)):
+                for item in v:
+                    lines.append('  %s: %s' % (k, item))
+            else:
+                lines.append('  %s: %s' % (k, v))
+
+    if plan['body_params']:
+        lines.append('')
+        lines.append('Body Parameters:')
+        for k, v in plan['body_params'].items():
+            lines.append('  %s: %s' % (k, v))
+
+    if plan['body_json_params']:
+        lines.append('')
+        lines.append('Body JSON Parameters:')
+        for k, v in plan['body_json_params'].items():
+            lines.append('  %s: %s' % (k, json.dumps(v)))
+
+    if plan['options']:
+        lines.append('')
+        lines.append('Options:')
+        for k, v in plan['options'].items():
+            if v is not None:
+                lines.append('  %s: %s' % (k, v))
+            else:
+                lines.append('  %s' % k)
+
+    return '\n'.join(lines) + '\n'
