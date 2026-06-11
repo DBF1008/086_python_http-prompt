@@ -6,6 +6,8 @@ from prompt_toolkit.document import Document
 from http_prompt.completer import HttpPromptCompleter
 from http_prompt.context import Context
 
+from .base import TempAppDirTestCase
+
 
 class TestCompleter(unittest.TestCase):
 
@@ -128,3 +130,69 @@ class TestCompleter(unittest.TestCase):
         self.context.url = 'http://localhost/orgs'
         result = self.get_completions('cd 1/')
         self.assertEqual(result, ['events', 'members'])
+
+    def test_profile_subcommand(self):
+        result = self.get_completions('profile ')
+        self.assertIn('save', result)
+        self.assertIn('load', result)
+        self.assertIn('list', result)
+        self.assertIn('delete', result)
+        self.assertIn('show', result)
+
+    def test_profile_subcommand_prefix(self):
+        result = self.get_completions('profile s')
+        self.assertIn('save', result)
+        self.assertIn('show', result)
+        self.assertNotIn('delete', result)
+
+    def test_profile_root_command(self):
+        result = self.get_completions('prof')
+        profile_results = [r for r in result if r.startswith('profile')]
+        self.assertTrue(len(profile_results) > 0)
+
+
+class TestCompleter_profile(TempAppDirTestCase):
+
+    def setUp(self):
+        super(TestCompleter_profile, self).setUp()
+        self.context = Context('http://localhost', spec={
+            'paths': {'/users': {}}
+        })
+        self.completer = HttpPromptCompleter(self.context)
+        self.completer_event = None
+
+    def get_completions(self, command):
+        if not isinstance(command, str):
+            command = command.decode()
+        position = len(command)
+        completions = self.completer.get_completions(
+            Document(text=command, cursor_position=position),
+            self.completer_event)
+        return [c.text for c in completions]
+
+    def test_profile_save_lists_profiles(self):
+        from http_prompt.contextio import save_context
+        c = self.context.copy()
+        c.profile_name = 'staging'
+        save_context(c)
+
+        result = self.get_completions('profile save ')
+        self.assertIn('staging', result)
+
+    def test_profile_load_lists_profiles(self):
+        from http_prompt.contextio import save_context
+        c = self.context.copy()
+        c.profile_name = 'production'
+        save_context(c)
+
+        result = self.get_completions('profile load ')
+        self.assertIn('production', result)
+
+    def test_profile_delete_lists_profiles(self):
+        from http_prompt.contextio import save_context
+        c = self.context.copy()
+        c.profile_name = 'temp'
+        save_context(c)
+
+        result = self.get_completions('profile delete ')
+        self.assertIn('temp', result)

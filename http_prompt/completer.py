@@ -17,6 +17,8 @@ RULES = [
     (r'((?:[^\s\'"\\=:]|(?:\\.))+):((?:[^\s\'"\\]|(?:\\.))*)$',
      'header_values'),
 
+    (r'profile\s+(save|load|delete)\s+', 'existing_profiles'),
+    (r'profile\s+', 'profile_subcommands'),
     (r'(get|head|post|put|patch|delete|connect)\s+', 'concat_mutations'),
     (r'(httpie|curl)\s+', 'preview'),
     (r'rm\s+\-b\s+', 'existing_body_params'),
@@ -137,6 +139,21 @@ class CompletionGenerator(object):
             if node.data.get('type') == 'dir'
         ]
         return self._generic_generate(names, {}, 'Endpoint')
+
+    def profile_subcommands(self, context, match):
+        subcommands = OrderedDict([
+            ('save', 'Save current environment as a profile'),
+            ('load', 'Load a saved profile'),
+            ('list', 'List all saved profiles'),
+            ('delete', 'Delete a saved profile'),
+            ('show', 'Show current profile name'),
+        ])
+        return self._generic_generate(subcommands.keys(), {}, subcommands)
+
+    def existing_profiles(self, context, match):
+        from .contextio import list_profiles
+        profiles = list_profiles()
+        return self._generic_generate(profiles, {}, 'Profile')
 
     def _generic_generate(self, names, values, descs):
         for name in sorted(names):

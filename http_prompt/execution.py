@@ -35,7 +35,7 @@ grammar = r"""
     command = mutation / immutation
 
     mutation = concat_mut+ / nonconcat_mut
-    immutation = preview / action / ls / env / help / exit / exec / source / clear / _
+    immutation = preview / action / ls / env / help / exit / exec / source / profile / clear / _
 
     concat_mut = option_mut / full_quoted_mut / value_quoted_mut / unquoted_mut
     nonconcat_mut = cd / rm
@@ -52,6 +52,14 @@ grammar = r"""
     env  = _ "env" _ (redir_out)?
     source = _ "source" _ filepath _
     exec = _ "exec" _ filepath _
+
+    profile = profile_save / profile_load / profile_list / profile_delete / profile_show
+    profile_save = _ "profile" _ "save" _ profile_name _
+    profile_load = _ "profile" _ "load" _ profile_name _
+    profile_list = _ "profile" _ "list" _
+    profile_delete = _ "profile" _ "delete" _ profile_name _
+    profile_show = _ "profile" _ "show" _
+    profile_name = ~r"[a-zA-Z0-9_.\-]+"
 
     redir_out = redir_append / redir_write / pipe
     redir_append = _ ">>" _ filepath _
@@ -363,6 +371,62 @@ class ExecutionVisitor(NodeVisitor):
 
     def visit_clear(self, node, children):
         self.output.clear()
+        return node
+
+    def visit_profile_name(self, node, children):
+        return node.text
+
+    def visit_profile_save(self, node, children):
+        _, _, _, _, _, name, _ = children
+        from .contextio import save_context
+        self.context.profile_name = name
+        save_context(self.context)
+        self.output.write('Profile saved: %s\n' % name)
+        return node
+
+    def visit_profile_load(self, node, children):
+        _, _, _, _, _, name, _ = children
+        from .contextio import _get_profile_filepath
+        filepath = _get_profile_filepath(name)
+        if not os.path.exists(filepath):
+            click.secho("Profile '%s' not found" % name, err=True, fg='red')
+            return node
+        execute('rm *', self.context, self.listener)
+        with open(filepath, encoding='utf-8') as f:
+            for line in f:
+                execute(line, self.context, self.listener)
+        self.context.profile_name = name
+        self.output.write('Profile loaded: %s\n' % name)
+        return node
+
+    def visit_profile_list(self, node, children):
+        from .contextio import list_profiles
+        profiles = list_profiles()
+        if profiles:
+            current = self.context.profile_name
+            lines = []
+            for p in profiles:
+                marker = ' *' if p == current else ''
+                lines.append(p + marker)
+            self.output.write('\n'.join(lines) + '\n')
+        else:
+            self.output.write('No profiles found.\n')
+        return node
+
+    def visit_profile_delete(self, node, children):
+        _, _, _, _, _, name, _ = children
+        from .contextio import delete_profile
+        if delete_profile(name):
+            if self.context.profile_name == name:
+                self.context.profile_name = None
+            self.output.write('Profile deleted: %s\n' % name)
+        else:
+            click.secho("Profile '%s' not found" % name, err=True, fg='red')
+        return node
+
+    def visit_profile_show(self, node, children):
+        name = self.context.profile_name or '(anonymous)'
+        self.output.write('Current profile: %s\n' % name)
         return node
 
     def visit_mutkey(self, node, children):

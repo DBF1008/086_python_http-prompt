@@ -55,6 +55,8 @@ class HttpPromptLexer(RegexLexer):
              combined('redir_out', 'pipe')),
             (r'(source)(\s*)', bygroups(Keyword, Text), 'file_path'),
             (r'(exec)(\s*)', bygroups(Keyword, Text), 'file_path'),
+            (r'(profile)(\s+)(save|load|list|delete|show)(\s*)',
+             bygroups(Keyword, Text, Keyword, Text), 'profile_arg'),
             (r'(ls)(\s*)', bygroups(Keyword, Text),
              combined('redir_out', 'urlpath')),
             (r'', Text, 'concat_mut')
@@ -109,6 +111,10 @@ class HttpPromptLexer(RegexLexer):
         ],
         'option_value': string_rules('#pop:2'),
         'file_path': string_rules('end'),
+        'profile_arg': [
+            (r'[a-zA-Z0-9_.\-]+', String, 'end'),
+            (r'\s*', Text, 'end'),
+        ],
         'redir_out': [
             (r'(?i)(>>?)(\s*)', bygroups(Operator, Text), 'file_path')
         ],

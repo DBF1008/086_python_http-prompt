@@ -1629,3 +1629,125 @@ class TestCommandPreviewRedirection(ExecutionTestCase):
         with open(filename) as f:
             content = f.read()
         self.assertEqual(content, 'hello world\nhttp http://localhost\n')
+
+
+class TestExecution_profile(ExecutionTestCase):
+
+    def test_profile_save(self):
+        self.context.headers['Accept'] = 'text/csv'
+        self.context.body_params['name'] = 'alice'
+        execute('profile save staging', self.context)
+        self.assertEqual(self.context.profile_name, 'staging')
+        self.assert_stdout('Profile saved: staging\n')
+
+        from http_prompt.contextio import _get_profile_filepath
+        filepath = _get_profile_filepath('staging')
+        self.assertTrue(os.path.exists(filepath))
+
+    def test_profile_save_with_hyphen_and_dot(self):
+        execute('profile save my-app.v2', self.context)
+        self.assertEqual(self.context.profile_name, 'my-app.v2')
+
+        from http_prompt.contextio import _get_profile_filepath
+        filepath = _get_profile_filepath('my-app.v2')
+        self.assertTrue(os.path.exists(filepath))
+
+    def test_profile_load(self):
+        # Save a profile with specific state
+        self.context.headers['Accept'] = 'text/csv'
+        self.context.url = 'http://staging.example.com'
+        execute('profile save staging', self.context)
+
+        # Clear and set different state
+        execute('rm *', self.context)
+        self.context.url = 'http://localhost'
+        self.context.headers['Accept'] = 'application/json'
+        self.context.profile_name = None
+
+        # Load the saved profile
+        execute('profile load staging', self.context)
+        self.assertEqual(self.context.headers.get('Accept'), 'text/csv')
+        self.assertEqual(self.context.url, 'http://staging.example.com')
+        self.assertEqual(self.context.profile_name, 'staging')
+
+    def test_profile_load_clears_existing_state(self):
+        # Save profile "A" with header X
+        self.context.headers['X-Token'] = 'aaa'
+        execute('profile save profA', self.context)
+
+        # Set header Y (not in profile A)
+        self.context.headers['X-Other'] = 'bbb'
+
+        # Load profile A — X-Other should be gone
+        execute('profile load profA', self.context)
+        self.assertIn('X-Token', self.context.headers)
+        self.assertNotIn('X-Other', self.context.headers)
+
+    def test_profile_load_nonexistent(self):
+        execute('profile load nosuchprofile', self.context)
+        self.assert_stderr("Profile 'nosuchprofile' not found")
+
+    def test_profile_list(self):
+        execute('profile save alpha', self.context)
+        self.context.profile_name = None
+        execute('profile save beta', self.context)
+
+        execute('profile list', self.context)
+        stdout = self.get_stdout()
+        self.assertIn('alpha', stdout)
+        self.assertIn('beta *', stdout)
+
+    def test_profile_list_empty(self):
+        execute('profile list', self.context)
+        self.assert_stdout('No profiles found.\n')
+
+    def test_profile_delete(self):
+        execute('profile save todelete', self.context)
+
+        from http_prompt.contextio import _get_profile_filepath
+        filepath = _get_profile_filepath('todelete')
+        self.assertTrue(os.path.exists(filepath))
+
+        execute('profile delete todelete', self.context)
+        self.assertFalse(os.path.exists(filepath))
+        self.assert_stdout('Profile deleted: todelete\n')
+
+    def test_profile_delete_active_resets_name(self):
+        execute('profile save active', self.context)
+        self.assertEqual(self.context.profile_name, 'active')
+
+        execute('profile delete active', self.context)
+        self.assertIsNone(self.context.profile_name)
+
+    def test_profile_delete_nonexistent(self):
+        execute('profile delete nosuchprofile', self.context)
+        self.assert_stderr("Profile 'nosuchprofile' not found")
+
+    def test_profile_show(self):
+        self.context.profile_name = 'staging'
+        execute('profile show', self.context)
+        self.assert_stdout('Current profile: staging\n')
+
+    def test_profile_show_anonymous(self):
+        execute('profile show', self.context)
+        self.assert_stdout('Current profile: (anonymous)\n')
+
+    def test_profile_show_with_spaces(self):
+        self.context.profile_name = 'prod'
+        execute('  profile   show  ', self.context)
+        self.assert_stdout('Current profile: prod\n')
+
+    def test_profile_save_does_not_change_url(self):
+        original_url = self.context.url
+        execute('profile save test1', self.context)
+        self.assertEqual(self.context.url, original_url)
+
+    def test_profile_roundtrip_non_ascii(self):
+        self.context.headers['Authorization'] = '中文Token'
+        execute('profile save unicode_test', self.context)
+
+        execute('rm *', self.context)
+        self.context.profile_name = None
+
+        execute('profile load unicode_test', self.context)
+        self.assertEqual(self.context.headers.get('Authorization'), '中文Token')

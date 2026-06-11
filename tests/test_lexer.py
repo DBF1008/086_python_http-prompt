@@ -656,6 +656,56 @@ class TestLexerPreviewRedirection(LexerTestCase):
         ])
 
 
+class TestLexer_profile(LexerTestCase):
+
+    def test_profile_save(self):
+        self.assertEqual(self.get_tokens('profile save staging'), [
+            (Keyword, 'profile'),
+            (Keyword, 'save'),
+            (String, 'staging')
+        ])
+
+    def test_profile_load(self):
+        self.assertEqual(self.get_tokens('profile load production'), [
+            (Keyword, 'profile'),
+            (Keyword, 'load'),
+            (String, 'production')
+        ])
+
+    def test_profile_list(self):
+        self.assertEqual(self.get_tokens('profile list'), [
+            (Keyword, 'profile'),
+            (Keyword, 'list')
+        ])
+
+    def test_profile_delete(self):
+        self.assertEqual(self.get_tokens('profile delete staging'), [
+            (Keyword, 'profile'),
+            (Keyword, 'delete'),
+            (String, 'staging')
+        ])
+
+    def test_profile_show(self):
+        self.assertEqual(self.get_tokens('profile show'), [
+            (Keyword, 'profile'),
+            (Keyword, 'show')
+        ])
+
+    def test_profile_with_spaces(self):
+        self.assertEqual(self.get_tokens('  profile   save   staging  '), [
+            (Keyword, 'profile'),
+            (Keyword, 'save'),
+            (String, 'staging')
+        ])
+
+    def test_profile_name_with_hyphens_dots(self):
+        self.assertEqual(self.get_tokens('profile save my-app.v2'), [
+            (Keyword, 'profile'),
+            (Keyword, 'save'),
+            (String, 'my-app.v2')
+        ])
+
+
 class TestLexerAction(LexerTestCase):
 
     def test_get(self):

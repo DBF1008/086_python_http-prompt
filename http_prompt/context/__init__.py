@@ -11,6 +11,7 @@ class Context(object):
         self.body_json_params = {}
         self.options = {}
         self.should_exit = False
+        self.profile_name = None
 
         # Create a tree for supporting API spec and ls command
         self.root = Node('root')
@@ -90,6 +91,7 @@ class Context(object):
         context.body_json_params = self.body_json_params.copy()
         context.options = self.options.copy()
         context.should_exit = self.should_exit
+        context.profile_name = self.profile_name
         return context
 
     def update(self, context):

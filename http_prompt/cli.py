@@ -153,7 +153,11 @@ def cli(spec, env, url, http_options):
 
     while True:
         try:
-            text = prompt('%s> ' % context.url, completer=completer,
+            if context.profile_name:
+                prompt_text = '[%s] %s> ' % (context.profile_name, context.url)
+            else:
+                prompt_text = '%s> ' % context.url
+            text = prompt(prompt_text, completer=completer,
                           lexer=lexer, style=style, history=history,
                           auto_suggest=AutoSuggestFromHistory(),
                           vi_mode=cfg['vi'])
