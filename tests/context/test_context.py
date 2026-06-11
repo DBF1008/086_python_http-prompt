@@ -64,6 +64,43 @@ def test_update():
     }
 
 
+def test_update_type_switch_form_to_json():
+    c1 = Context('http://localhost')
+    c1.body_params['name'] = 'alice'
+
+    c2 = Context(None)
+    c2.body_json_params['name'] = 'bob'
+
+    c1.update(c2)
+    assert 'name' not in c1.body_params
+    assert c1.body_json_params == {'name': 'bob'}
+
+
+def test_update_type_switch_json_to_form():
+    c1 = Context('http://localhost')
+    c1.body_json_params['count'] = 5
+
+    c2 = Context(None)
+    c2.body_params['count'] = 'five'
+
+    c1.update(c2)
+    assert 'count' not in c1.body_json_params
+    assert c1.body_params == {'count': 'five'}
+
+
+def test_update_preserves_unrelated_keys():
+    c1 = Context('http://localhost')
+    c1.body_params['name'] = 'alice'
+    c1.body_json_params['age'] = 30
+
+    c2 = Context(None)
+    c2.body_json_params['name'] = 'bob'
+
+    c1.update(c2)
+    assert c1.body_params == {}
+    assert c1.body_json_params == {'age': 30, 'name': 'bob'}
+
+
 def test_spec():
     c = Context('http://localhost', spec={
         'paths': {

@@ -98,6 +98,13 @@ class Context(object):
 
         self.headers.update(context.headers)
         self.querystring_params.update(context.querystring_params)
+
+        # Ensure mutual exclusivity between form and JSON body params
+        for key in context.body_params:
+            self.body_json_params.pop(key, None)
+        for key in context.body_json_params:
+            self.body_params.pop(key, None)
+
         self.body_params.update(context.body_params)
         self.body_json_params.update(context.body_json_params)
         self.options.update(context.options)

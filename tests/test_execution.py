@@ -766,6 +766,38 @@ class TestExecution_rm(ExecutionTestCase):
         self.assertFalse(self.context.body_params)
         self.assertFalse(self.context.body_json_params)
 
+    def test_rm_body_param_after_type_switch(self):
+        execute('name=alice', self.context)
+        execute("name:='\"bob\"'", self.context)
+        execute('rm -b name', self.context)
+        self.assertFalse(self.context.body_params)
+        self.assertFalse(self.context.body_json_params)
+
+    def test_rm_body_param_in_both_dicts(self):
+        self.context.body_params['name'] = 'alice'
+        self.context.body_json_params['name'] = 'bob'
+        execute('rm -b name', self.context)
+        self.assertFalse(self.context.body_params)
+        self.assertFalse(self.context.body_json_params)
+
+    def test_rm_body_param_repeated(self):
+        self.context.body_params['name'] = 'alice'
+        execute('rm -b name', self.context)
+        self.assertFalse(self.context.body_params)
+        execute('rm -b name', self.context)
+        self.assert_stderr("Key 'name' not found")
+
+    def test_rm_body_param_not_found(self):
+        execute('rm -b nonexistent', self.context)
+        self.assert_stderr("Key 'nonexistent' not found")
+
+    def test_rm_body_star_clears_both_types(self):
+        self.context.body_params['name'] = 'alice'
+        self.context.body_json_params['count'] = 5
+        execute('rm -b *', self.context)
+        self.assertFalse(self.context.body_params)
+        self.assertFalse(self.context.body_json_params)
+
 
 class TestExecution_ls(ExecutionTestCase):
 
@@ -1074,6 +1106,28 @@ class TestMutation(ExecutionTestCase):
         execute(r'foo\=bar=hello', self.context)
         self.assertEqual(self.context.body_params, {
             r'foo\=bar': 'hello'
+        })
+
+    def test_type_switch_form_to_json(self):
+        execute('name=alice', self.context)
+        execute("name:='\"bob\"'", self.context)
+        self.assertNotIn('name', self.context.body_params)
+        self.assertEqual(self.context.body_json_params, {'name': 'bob'})
+
+    def test_type_switch_json_to_form(self):
+        execute('count:=5', self.context)
+        execute('count=five', self.context)
+        self.assertNotIn('count', self.context.body_json_params)
+        self.assertEqual(self.context.body_params, {'count': 'five'})
+
+    def test_type_switch_preserves_other_keys(self):
+        execute('name=alice', self.context)
+        execute('age:=30', self.context)
+        execute("name:='\"bob\"'", self.context)
+        self.assertNotIn('name', self.context.body_params)
+        self.assertEqual(self.context.body_json_params, {
+            'age': 30,
+            'name': 'bob'
         })
 
 

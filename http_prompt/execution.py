@@ -271,15 +271,19 @@ class ExecutionVisitor(NodeVisitor):
             target = self.context.options
         else:
             assert kind == '-b'
-            # TODO: This is kind of ugly, will fix it
             if name == '*':
                 self.context.body_params.clear()
                 self.context.body_json_params.clear()
             else:
-                try:
+                found = False
+                if name in self.context.body_params:
                     del self.context.body_params[name]
-                except KeyError:
+                    found = True
+                if name in self.context.body_json_params:
                     del self.context.body_json_params[name]
+                    found = True
+                if not found:
+                    raise KeyError(name)
             return node
 
         if name == '*':
